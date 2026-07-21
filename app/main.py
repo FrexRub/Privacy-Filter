@@ -17,6 +17,12 @@ API_TOKEN = os.getenv("PRIVACY_FILTER_API_TOKEN")
 DEFAULT_DEVICE = os.getenv("OPF_DEVICE", "cpu")
 DEFAULT_OUTPUT_MODE = os.getenv("OPF_OUTPUT_MODE", "typed")
 OPF_TIMEOUT_SECONDS = int(os.getenv("OPF_TIMEOUT_SECONDS", "300"))
+OPF_FALLBACK_TO_RU_RULES = os.getenv("OPF_FALLBACK_TO_RU_RULES", "true").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OUTPUT_MODES = {"typed", "redacted"}
 DEFAULT_OPF_CHECKPOINT_DIR = Path.home() / ".opf" / "privacy_filter"
@@ -358,6 +364,16 @@ def _apply_ru_rules(opf_response: dict[str, Any], output_mode: str) -> dict[str,
     return opf_response
 
 
+def _ru_rules_only_response(text: str, output_mode: str, reason: str) -> dict[str, Any]:
+    response = _empty_response(text, output_mode)
+    response["summary"] = {
+        **response["summary"],
+        "source": "ru_rules_fallback",
+        "fallback_reason": reason,
+    }
+    return _apply_ru_rules(response, output_mode)
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -374,7 +390,16 @@ def redact(
     if not payload.text.strip():
         return _empty_response(payload.text, payload.output_mode)
 
-    response = _run_opf(payload)
+    try:
+        response = _run_opf(payload)
+    except HTTPException as exc:
+        if not OPF_FALLBACK_TO_RU_RULES:
+            raise
+
+        logger.warning("Returning RU-rules fallback response because OPF failed: %r", exc.detail)
+        response = _ru_rules_only_response(payload.text, payload.output_mode, "opf_failed")
+        return response
+
     if payload.apply_ru_rules:
         response = _apply_ru_rules(response, payload.output_mode)
 
