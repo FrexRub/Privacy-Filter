@@ -2,7 +2,6 @@ services:
   privacy-filter-api:
     build: .
     environment:
-      OPF_CHECKPOINT: ${OPF_CHECKPOINT:-}
       OPF_DEVICE: ${OPF_DEVICE:-cpu}
       OPF_OUTPUT_MODE: ${OPF_OUTPUT_MODE:-typed}
       OPF_TIMEOUT_SECONDS: ${OPF_TIMEOUT_SECONDS:-300}

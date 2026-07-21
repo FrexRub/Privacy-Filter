@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 import subprocess
@@ -16,6 +17,8 @@ DEFAULT_OUTPUT_MODE = os.getenv("OPF_OUTPUT_MODE", "typed")
 OPF_TIMEOUT_SECONDS = int(os.getenv("OPF_TIMEOUT_SECONDS", "300"))
 ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OUTPUT_MODES = {"typed", "redacted"}
+
+logger = logging.getLogger("privacy_filter_api")
 
 
 @dataclass(frozen=True)
@@ -179,15 +182,26 @@ def _run_opf(payload: RedactRequest) -> dict[str, Any]:
             input_path,
         ]
 
+        env = os.environ.copy()
+        if not env.get("OPF_CHECKPOINT"):
+            env.pop("OPF_CHECKPOINT", None)
+
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=OPF_TIMEOUT_SECONDS,
             check=False,
+            env=env,
         )
 
         if result.returncode != 0:
+            logger.error(
+                "opf failed with exit code %s. stderr=%r stdout=%r",
+                result.returncode,
+                result.stderr,
+                result.stdout,
+            )
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -211,6 +225,7 @@ def _run_opf(payload: RedactRequest) -> dict[str, Any]:
                 except json.JSONDecodeError:
                     continue
 
+            logger.error("opf returned non-json output. stdout=%r stderr=%r", stdout, result.stderr)
             raise HTTPException(
                 status_code=500,
                 detail={
@@ -220,6 +235,7 @@ def _run_opf(payload: RedactRequest) -> dict[str, Any]:
                 },
             )
     except subprocess.TimeoutExpired as exc:
+        logger.exception("opf timed out after %s seconds", OPF_TIMEOUT_SECONDS)
         raise HTTPException(
             status_code=504,
             detail={
