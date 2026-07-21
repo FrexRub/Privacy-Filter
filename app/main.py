@@ -2,9 +2,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Header, HTTPException
@@ -17,6 +19,7 @@ DEFAULT_OUTPUT_MODE = os.getenv("OPF_OUTPUT_MODE", "typed")
 OPF_TIMEOUT_SECONDS = int(os.getenv("OPF_TIMEOUT_SECONDS", "300"))
 ALLOWED_DEVICES = {"cpu", "cuda"}
 ALLOWED_OUTPUT_MODES = {"typed", "redacted"}
+DEFAULT_OPF_CHECKPOINT_DIR = Path.home() / ".opf" / "privacy_filter"
 
 logger = logging.getLogger("privacy_filter_api")
 
@@ -149,6 +152,23 @@ def _validate_request(payload: RedactRequest) -> None:
         )
 
 
+def _remove_incomplete_default_checkpoint(env: dict[str, str]) -> None:
+    if env.get("OPF_CHECKPOINT"):
+        return
+
+    checkpoint_dir = DEFAULT_OPF_CHECKPOINT_DIR
+    if not checkpoint_dir.exists():
+        return
+
+    has_config = (checkpoint_dir / "config.json").is_file()
+    has_weights = any(checkpoint_dir.glob("*.safetensors"))
+    if has_config and has_weights:
+        return
+
+    logger.warning("Removing incomplete default OPF checkpoint at %s", checkpoint_dir)
+    shutil.rmtree(checkpoint_dir)
+
+
 def _empty_response(text: str, output_mode: str) -> dict[str, Any]:
     return {
         "schema_version": 1,
@@ -185,6 +205,7 @@ def _run_opf(payload: RedactRequest) -> dict[str, Any]:
         env = os.environ.copy()
         if not env.get("OPF_CHECKPOINT"):
             env.pop("OPF_CHECKPOINT", None)
+        _remove_incomplete_default_checkpoint(env)
 
         result = subprocess.run(
             cmd,
