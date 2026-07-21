@@ -9,7 +9,7 @@ services:
     volumes:
       - opf-model-cache:/root/.opf
     networks:
-      - n8n-n8n-9hh60z
+      - n8n-n8nrunnerpostgresollama-uxqm0a
     expose:
       - "8000"
     restart: unless-stopped
@@ -18,5 +18,5 @@ volumes:
   opf-model-cache:
 
 networks:
-  n8n-n8n-9hh60z:
+  n8n-n8nrunnerpostgresollama-uxqm0a:
     external: true
