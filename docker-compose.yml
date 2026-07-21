@@ -2,16 +2,22 @@ services:
   privacy-filter-api:
     build: .
     environment:
-      OPF_CHECKPOINT: /models/privacy_filter
-      OPF_DEVICE: cpu
-      OPF_OUTPUT_MODE: typed
-      OPF_TIMEOUT_SECONDS: 300
+      OPF_CHECKPOINT: ${OPF_CHECKPOINT:-/models/privacy_filter}
+      OPF_DEVICE: ${OPF_DEVICE:-cpu}
+      OPF_OUTPUT_MODE: ${OPF_OUTPUT_MODE:-typed}
+      OPF_TIMEOUT_SECONDS: ${OPF_TIMEOUT_SECONDS:-300}
       PRIVACY_FILTER_API_TOKEN: ${PRIVACY_FILTER_API_TOKEN:-}
     volumes:
       - opf-model-cache:/models
+    networks:
+      - n8n-n8n-9hh60z
     ports:
       - "8000:8000"
     restart: unless-stopped
 
 volumes:
   opf-model-cache:
+
+networks:
+  n8n-n8n-9hh60z:
+    external: true
