@@ -26,22 +26,22 @@ docker compose up --build -d
 
 ## API
 
-Проверка состояния сервиса:
+Проверка состояния сервиса из контейнера в той же Docker-сети:
 
 ```bash
-curl http://localhost:8000/health
+curl http://privacy-filter-api:8000/health
 ```
 
 Маскирование текста:
 
 ```bash
-curl -X POST http://localhost:8000/redact \
+curl -X POST http://privacy-filter-api:8000/redact \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $PRIVACY_FILTER_API_TOKEN" \
   -d '{"text":"ФИО: Иванов Иван Иванович, email: ivan@example.com, телефон +7 999 123-45-67"}'
 ```
 
-Если n8n запущен в той же Docker-сети, используйте URL:
+В n8n используйте URL:
 
 ```text
 http://privacy-filter-api:8000/redact
